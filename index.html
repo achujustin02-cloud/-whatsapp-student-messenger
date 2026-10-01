@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>WhatsApp Student Messenger</title>
+
+</head>
+
+
+<body>
+
+<h1>WhatsApp Student Messenger</h1>
+
+
+<!-- =====================================
+     STEP 1 - UPLOAD WORD FILE
+===================================== -->
+
+<h3>1. Upload Student Word File</h3>
+
+<input
+    type="file"
+    id="wordFile"
+    accept=".docx"
+>
+
+<br><br>
+
+<button onclick="loadWordFile()">
+    Load Students
+</button>
+
+
+<hr>
+
+
+<!-- =====================================
+     STEP 2 - SELECT STUDENTS
+===================================== -->
+
+<h3>2. Select Students</h3>
+
+<label>
+
+    <input
+        type="checkbox"
+        id="selectAll"
+    >
+
+    Select All
+
+</label>
+
+
+<br><br>
+
+
+<div id="studentList">
+
+    <p>
+        No students loaded.
+    </p>
+
+</div>
+
+
+<hr>
+
+
+<!-- =====================================
+     STEP 3 - MESSAGE
+===================================== -->
+
+<h3>3. Write Message</h3>
+
+<p>
+Use <b>{name}</b> to automatically insert
+the student's name.
+</p>
+
+
+<textarea
+    id="message"
+    rows="7"
+    cols="50"
+    placeholder="Hello {name},
+
+You were absent from today's class.
+
+Please contact the coordinator if this was incorrect."
+></textarea>
+
+
+<br><br>
+
+
+<!-- =====================================
+     START BUTTON
+===================================== -->
+
+<button onclick="startMessaging()">
+
+    Start WhatsApp Messaging
+
+</button>
+
+
+<hr>
+
+
+<!-- =====================================
+     MESSAGE PROGRESS
+===================================== -->
+
+<div id="messagingArea">
+
+</div>
+
+
+<!-- =====================================
+     MAMMOTH DOCX LIBRARY
+===================================== -->
+
+<script
+src="https://unpkg.com/mammoth/mammoth.browser.min.js">
+</script>
+
+
+<script>
+
+
+/* =========================================
+   GLOBAL VARIABLES
+========================================= */
+
+let students = [];
+
+let selectedStudents = [];
+
+let currentIndex = 0;
+
+let currentMessage = "";
+
+
+/* =========================================
+   LOAD WORD FILE
+========================================= */
+
+async function loadWordFile() {
+
+
+    const fileInput =
+        document.getElementById(
+            "wordFile"
+        );
+
+
+    /* Check file */
+
+    if (!fileInput.files.length) {
+
+        alert(
+            "Please select a Word (.docx) file."
+        );
+
+        return;
+
+    }
+
+
+    const file =
+        fileInput.files[0];
+
+
+    try {
+
+
+        /* Read file */
+
+        const arrayBuffer =
+            await file.arrayBuffer();
+
+
+        /* Convert DOCX */
+
+        const result =
+            await mammoth.convertToHtml({
+
+                arrayBuffer:
+                    arrayBuffer
+
+            });
+
+
+        /* Process */
+
+        parseWordFile(
+            result.value
+        );
+
+
+    } catch (error) {
+
+
+        console.error(error);
+
+
+        alert(
+            "Unable to read the Word file."
+        );
+
+
+    }
+
+}
+
+
+/* =========================================
+   PARSE WORD FILE
+========================================= */
+
+function parseWordFile(html) {
+
+
+    const parser =
+        new DOMParser();
+
+
+    const document =
+        parser.parseFromString(
+            html,
+            "text/html"
+        );
+
+
+    const rows =
+        document.querySelectorAll("tr");
+
+
+    students = [];
+
+
+    rows.forEach(
+        function(row) {
+
+
+            const cells =
+                row.querySelectorAll(
+                    "td, th"
+                );
+
+
+            /* Need 2 columns */
+
+            if (
+                cells.length < 2
+            ) {
+
+                return;
+
+            }
+
+
+            let name =
+                cells[0]
+                    .textContent
+                    .trim();
+
+
+            let phone =
+                cells[1]
+                    .textContent
+                    .trim();
+
+
+            /* Ignore header */
+
+            if (
+
+                name
+                    .toLowerCase() ===
+                    "name"
+
+                ||
+
+                phone
+                    .toLowerCase()
+                    .includes(
+                        "whatsapp"
+                    )
+
+            ) {
+
+                return;
+
+            }
+
+
+            /*
+                Remove:
+                +
+                spaces
+                -
+                brackets
+            */
+
+            phone =
+                phone.replace(
+                    /\D/g,
+                    ""
+                );
+
+
+            /* Add student */
+
+            if (
+                name &&
+                phone
+            ) {
+
+                students.push({
+
+                    name:
+                        name,
+
+                    phone:
+                        phone
+
+                });
+
+            }
+
+        }
+    );
+
+
+    showStudents();
+
+}
+
+
+/* =========================================
+   DISPLAY STUDENTS
+========================================= */
+
+function showStudents() {
+
+
+    const list =
+        document.getElementById(
+            "studentList"
+        );
+
+
+    list.innerHTML = "";
+
+
+    if (
+        students.length === 0
+    ) {
+
+        list.innerHTML =
+            "<p>No students found.</p>";
+
+        return;
+
+    }
+
+
+    students.forEach(
+        function(student, index) {
+
+
+            const div =
+                document.createElement(
+                    "div"
+                );
+
+
+            div.innerHTML = `
+
+                <label>
+
+                    <input
+                        type="checkbox"
+                        class="studentCheck"
+                        data-index="${index}"
+                    >
+
+                    <b>
+                        ${escapeHTML(student.name)}
+                    </b>
+
+                    -
+
+                    +${student.phone}
+
+                </label>
+
+                <br>
+
+            `;
+
+
+            list.appendChild(
+                div
+            );
+
+        }
+    );
+
+
+    document.getElementById(
+        "messagingArea"
+    ).innerHTML =
+
+        "<p>" +
+
+        students.length +
+
+        " students loaded.</p>";
+
+}
+
+
+/* =========================================
+   SELECT ALL
+========================================= */
+
+document
+.getElementById("selectAll")
+.addEventListener(
+    "change",
+    function() {
+
+
+        const checkboxes =
+            document.querySelectorAll(
+                ".studentCheck"
+            );
+
+
+        checkboxes.forEach(
+            function(box) {
+
+                box.checked =
+                    document
+                    .getElementById(
+                        "selectAll"
+                    )
+                    .checked;
+
+            }
+        );
+
+    }
+);
+
+
+/* =========================================
+   START MESSAGING
+========================================= */
+
+function startMessaging() {
+
+
+    /* Get message */
+
+    currentMessage =
+        document
+        .getElementById(
+            "message"
+        )
+        .value
+        .trim();
+
+
+    /* Check message */
+
+    if (!currentMessage) {
+
+        alert(
+            "Please enter a message."
+        );
+
+        return;
+
+    }
+
+
+    /* Get selected students */
+
+    const selected =
+        document.querySelectorAll(
+            ".studentCheck:checked"
+        );
+
+
+    /* Check students */
+
+    if (
+        selected.length === 0
+    ) {
+
+        alert(
+            "Please select at least one student."
+        );
+
+        return;
+
+    }
+
+
+    /* Reset */
+
+    selectedStudents = [];
+
+    currentIndex = 0;
+
+
+    /* Create selected list */
+
+    selected.forEach(
+        function(box) {
+
+
+            const index =
+                Number(
+                    box.dataset.index
+                );
+
+
+            selectedStudents.push(
+                students[index]
+            );
+
+        }
+    );
+
+
+    /* Show first student */
+
+    showNextStudent();
+
+}
+
+
+/* =========================================
+   SHOW CURRENT STUDENT
+========================================= */
+
+function showNextStudent() {
+
+
+    const area =
+        document.getElementById(
+            "messagingArea"
+        );
+
+
+    /* Finished */
+
+    if (
+        currentIndex >=
+        selectedStudents.length
+    ) {
+
+
+        area.innerHTML = `
+
+            <h3>Finished</h3>
+
+            <p>
+                All selected students
+                have been processed.
+            </p>
+
+            <p>
+                Total:
+                ${selectedStudents.length}
+                students
+            </p>
+
+        `;
+
+
+        return;
+
+    }
+
+
+    /* Current student */
+
+    const student =
+        selectedStudents[
+            currentIndex
+        ];
+
+
+    /* Progress */
+
+    const number =
+        currentIndex + 1;
+
+
+    const total =
+        selectedStudents.length;
+
+
+    area.innerHTML = `
+
+        <h3>
+            Student ${number} of ${total}
+        </h3>
+
+        <p>
+
+            <b>Name:</b>
+            ${escapeHTML(student.name)}
+
+        </p>
+
+        <p>
+
+            <b>WhatsApp:</b>
+            +${student.phone}
+
+        </p>
+
+        <p>
+
+            <b>Message:</b>
+
+        </p>
+
+        <p>
+
+            ${escapeHTML(
+                createMessage(student)
+            )}
+
+        </p>
+
+
+        <button
+            onclick="openCurrentWhatsApp()"
+        >
+
+            Open WhatsApp
+
+        </button>
+
+
+        <br><br>
+
+
+        <button
+            onclick="nextStudent()"
+        >
+
+            Next Student →
+
+        </button>
+
+
+        <br><br>
+
+
+        <button
+            onclick="cancelMessaging()"
+        >
+
+            Stop
+
+        </button>
+
+    `;
+
+}
+
+
+/* =========================================
+   CREATE PERSONAL MESSAGE
+========================================= */
+
+function createMessage(student) {
+
+
+    return currentMessage.replace(
+        /\{name\}/gi,
+        student.name
+    );
+
+}
+
+
+/* =========================================
+   OPEN CURRENT WHATSAPP
+========================================= */
+
+function openCurrentWhatsApp() {
+
+
+    if (
+        currentIndex >=
+        selectedStudents.length
+    ) {
+
+        return;
+
+    }
+
+
+    const student =
+        selectedStudents[
+            currentIndex
+        ];
+
+
+    const message =
+        createMessage(
+            student
+        );
+
+
+    const encodedMessage =
+        encodeURIComponent(
+            message
+        );
+
+
+    const url =
+
+        "https://wa.me/" +
+
+        student.phone +
+
+        "?text=" +
+
+        encodedMessage;
+
+
+    /*
+       Open WhatsApp
+    */
+
+    window.open(
+        url,
+        "_blank"
+    );
+
+}
+
+
+/* =========================================
+   NEXT STUDENT
+========================================= */
+
+function nextStudent() {
+
+
+    if (
+        currentIndex <
+        selectedStudents.length
+    ) {
+
+        currentIndex++;
+
+    }
+
+
+    showNextStudent();
+
+}
+
+
+/* =========================================
+   STOP
+========================================= */
+
+function cancelMessaging() {
+
+
+    selectedStudents = [];
+
+    currentIndex = 0;
+
+    currentMessage = "";
+
+
+    document.getElementById(
+        "messagingArea"
+    ).innerHTML =
+
+        "<p>Messaging stopped.</p>";
+
+}
+
+
+/* =========================================
+   HTML SECURITY
+========================================= */
+
+function escapeHTML(text) {
+
+
+    return text
+
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+
+        .replace(
+            /</g,
+            "&lt;"
+        )
+
+        .replace(
+            />/g,
+            "&gt;"
+        )
+
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+
+
+</script>
+
+
+</body>
+
+  </html>
